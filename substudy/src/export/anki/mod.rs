@@ -124,7 +124,8 @@ pub(crate) fn export_anki_helper(
         let native = ctx.map(|&(_, ref n)| n).flatten();
 
         if let Some(curr) = foreign.curr {
-            let period = curr.period.grow(1.5, 1.5);
+            // let period = curr.period.grow(1.5, 1.5);
+            let period = curr.period.grow(0.0, 0.25);
 
             let image_filename = exporter.schedule_image_export(period.midpoint());
             let audio_filename = exporter.schedule_audio_export(foreign_lang, period);
