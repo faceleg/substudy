@@ -6,11 +6,13 @@ use std::{
     ffi::OsStr,
     fmt::Write as fmt_Write,
     fs,
+    io::Cursor,
     io::Write,
     path::{Path, PathBuf},
 };
 
 use anyhow::{anyhow, Context as _};
+use image::{DynamicImage, ImageFormat};
 use log::debug;
 
 use crate::{
@@ -245,10 +247,9 @@ impl Exporter {
         self.dir.join(file_name)
     }
 
-    /// Export an attached picture and return the file name we used as a string.
     fn export_attached_picture(&self) -> Result<String> {
         let pic = self.video.attached_pic()?;
-        let ext = match &pic.mime_type[..] {
+        let _ext = match &pic.mime_type[..] {
             "image/jpeg" => "jpg",
             "image/png" => "png",
             "image/gif" => "gif",
@@ -259,9 +260,20 @@ impl Exporter {
                 ));
             }
         };
-        let path = format!("{}_pic.{}", self.file_stem, ext);
-        self.export_data_file(&path, &pic.data)?;
+
+        let img = image::load_from_memory(&pic.data)?;
+        let webp_data = self.encode_webp(&img)?;
+
+        let path = format!("{}_pic.webp", self.file_stem);
+        self.export_data_file(&path, &webp_data)?;
         Ok(path)
+    }
+
+    fn encode_webp(&self, img: &DynamicImage) -> Result<Vec<u8>> {
+        let mut webp_data: Vec<u8> = Vec::new();
+        let mut cursor = Cursor::new(&mut webp_data);
+        img.write_to(&mut cursor, ImageFormat::WebP)?;
+        Ok(webp_data)
     }
 
     /// Try to export an attached picture, if we haven't already.
@@ -283,7 +295,7 @@ impl Exporter {
     pub fn schedule_image_export(&mut self, time: f32) -> Option<String> {
         match self.image_source_type {
             Some(ImageSourceType::Video) => {
-                let path = self.media_path(time, None, "jpg");
+                let path = self.media_path(time, None, "webp");
                 self.extractions.push(Extraction {
                     path: path.clone(),
                     spec: ExtractionSpec::Image { time },
